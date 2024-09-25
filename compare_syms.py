@@ -43,6 +43,7 @@ def compare_symbols(ground_truth, binarly, third_tool):
 
     for addr in all_symbols:
         if addr not in ground_truth:
+            # print(f"Symbol '{third_tool[addr]}' is missing in readelf_output")
             pass
 
         if addr in third_tool and addr not in binarly:
@@ -50,6 +51,7 @@ def compare_symbols(ground_truth, binarly, third_tool):
 
         if addr in ground_truth and addr not in binarly:
             readelf_gt_mismatch += 1
+            # print(f"Symbol :: `{syms1[addr]}` @ {hex(addr)} missing in binarly")
         if addr in ground_truth and addr in binarly:
             if ground_truth[addr] != binarly[addr]:
                 print(f"mismatch in naming @ {hex(addr)}:")
@@ -60,8 +62,36 @@ def compare_symbols(ground_truth, binarly, third_tool):
     print(f"    mismatches with ground truth: {readelf_gt_mismatch}")
     print(f"    mismatches with binary ninja: {binja_mismatch}")
 
+def check_pattern_match_addr():
+    pattern_matches = []
+    with open("pattern_matches.txt", 'r') as f:
+        for l in f.readlines():
+            pattern_matches.append(int(l.strip(), 16))
+
+    funcs_binja = parse_syms_txt('binja_syms.txt')
+    missing = 0
+    x = 8
+    within_x = 0
+    for addr in pattern_matches:
+        if addr not in funcs_binja.keys():
+            missing += 1
+            print(f"not found: {hex(addr)}")
+            for func_start in funcs_binja.keys():
+                if addr - x <= func_start and addr >= func_start:
+                    print(f"    but close by: {hex(func_start)}")
+                    within_x += 1
+                    break
+    
+    print(f"[*] Found:   {len(pattern_matches) - missing}")
+    print(f"    Missing: {missing}")
+    print(f"        Within {x}: {within_x}")
+    print(f"    Binja:   {len(funcs_binja)}")
+
+# Parse the symbol files
 syms_binja = parse_syms_txt('binja_syms.txt')
 syms_binarly = parse_syms_binarly_txt('syms_binarly.txt')
 syms_readelf = parse_syms_readelf('readelf_output.txt')
 
+# Compare the symbols
 compare_symbols(syms_readelf, syms_binarly, syms_binja)
+check_pattern_match_addr()
