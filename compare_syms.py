@@ -11,6 +11,7 @@ def parse_syms_txt(filename):
                 symbols[addr] = symbol
     return symbols
 
+
 def parse_syms_binarly_txt(filename):
     symbols = {}
     current_symbol = None
@@ -25,6 +26,18 @@ def parse_syms_binarly_txt(filename):
                 symbols[addr] = current_symbol
     return symbols
 
+
+def parse_funcs_binarly_txt(filename):
+    funcs = []
+    with open(filename, 'r') as f:
+        for line in f:
+            line = line.strip()
+            addr = int(line, 16)
+            funcs.append(addr)
+
+    return funcs
+
+
 def parse_syms_readelf(filename):
     symbols = {}
     with open(filename, 'r') as f:
@@ -36,8 +49,9 @@ def parse_syms_readelf(filename):
                 symbols[address] = symbol
     return symbols
 
-def compare_symbols(ground_truth, binarly, third_tool):
-    all_symbols = set(ground_truth.keys()) | set(binarly.keys() | set(third_tool.keys()))
+
+def compare_symbols(ground_truth, binarly_syms, binarly_funcs, third_tool):
+    all_symbols = set(ground_truth.keys()) | set(binarly_syms.keys() | set(third_tool.keys()))
     readelf_gt_mismatch = 0
     binja_mismatch = 0
 
@@ -46,21 +60,22 @@ def compare_symbols(ground_truth, binarly, third_tool):
             # print(f"Symbol '{third_tool[addr]}' is missing in readelf_output")
             pass
 
-        if addr in third_tool and addr not in binarly:
+        if addr in third_tool and addr not in binarly_funcs:
             binja_mismatch += 1
 
-        if addr in ground_truth and addr not in binarly:
+        if addr in ground_truth and addr not in binarly_syms:
             readelf_gt_mismatch += 1
-            # print(f"Symbol :: `{syms1[addr]}` @ {hex(addr)} missing in binarly")
-        if addr in ground_truth and addr in binarly:
-            if ground_truth[addr] != binarly[addr]:
+            print(f"Symbol :: `{ground_truth[addr]}` @ {hex(addr)} missing in binarly")
+        if addr in ground_truth and addr in binarly_syms:
+            if ground_truth[addr] != binarly_syms[addr]:
                 print(f"mismatch in naming @ {hex(addr)}:")
                 print(f"    ground truth -> {ground_truth[addr]}")
-                print(f"    binarly      -> {binarly[addr]}")
+                print(f"    binarly      -> {binarly_syms[addr]}")
 
     print("[*] Statistics")
-    print(f"    mismatches with ground truth: {readelf_gt_mismatch}")
-    print(f"    mismatches with binary ninja: {binja_mismatch}")
+    print(f"    sym mismatches with ground truth: {readelf_gt_mismatch}")
+    print(f"    func mismatches with binary ninja: {binja_mismatch}")
+
 
 def check_pattern_match_addr():
     pattern_matches = []
@@ -75,10 +90,10 @@ def check_pattern_match_addr():
     for addr in pattern_matches:
         if addr not in funcs_binja.keys():
             missing += 1
-            print(f"not found: {hex(addr)}")
+            # print(f"not found: {hex(addr)}")
             for func_start in funcs_binja.keys():
                 if addr - x <= func_start and addr >= func_start:
-                    print(f"    but close by: {hex(func_start)}")
+                    # print(f"    but close by: {hex(func_start)}")
                     within_x += 1
                     break
     
@@ -87,11 +102,13 @@ def check_pattern_match_addr():
     print(f"        Within {x}: {within_x}")
     print(f"    Binja:   {len(funcs_binja)}")
 
+
 # Parse the symbol files
 syms_binja = parse_syms_txt('binja_syms.txt')
 syms_binarly = parse_syms_binarly_txt('syms_binarly.txt')
+funcs_binarly = parse_funcs_binarly_txt('funcs_binarly.txt')
 syms_readelf = parse_syms_readelf('readelf_output.txt')
 
 # Compare the symbols
-compare_symbols(syms_readelf, syms_binarly, syms_binja)
+compare_symbols(syms_readelf, syms_binarly, funcs_binarly, syms_binja)
 check_pattern_match_addr()
